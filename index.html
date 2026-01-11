@@ -66,10 +66,13 @@ let obstacles=[],coins=[]
 let score=0,level=1,nextLevelScore=10
 let nusd=parseInt(localStorage.getItem('satsumeNUSD')||'0')
 nusdText.textContent='NUSD: '+nusd
-let speed=6,gameOver=false,hardcore=false
+let isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+let speed=isMobile?4.5:6,gameOver=false,hardcore=false
 let spawnInterval=1500,minGap=600,obstacleTimer=null
 let jumpCount=0
-const maxJump=2,firstJump=21,secondJump=18
+const maxJump=2,
+  firstJump=isMobile?23:21,
+  secondJump=isMobile?20:18
 function jump(){if(gameOver)return;if(jumpCount<maxJump){velocityY=jumpCount===0?firstJump:secondJump;jumpCount++}}
 document.addEventListener('keydown',jump)
 document.addEventListener('touchstart',jump)
@@ -115,7 +118,10 @@ function levelUp(){
 
   // ⏩ peningkatan kecepatan hanya tiap 20 level
   if(level % 20 === 0){
-    speed += hardcore ? 1.4 : 1
+    // mobile lebih pelan naik speed
+    speed += isMobile
+      ? (hardcore ? 0.6 : 0.4)
+      : (hardcore ? 1.4 : 1)
   }
 
   // spawn makin rapat tetap bertahap
@@ -127,7 +133,7 @@ function levelUp(){
   startObstacleTimer()
 }
 function endGame(){gameOver=true;gameOverScreen.style.display='flex'}
-function restart(){obstacles.forEach(o=>o.remove());coins.forEach(c=>c.remove());obstacles=[];coins=[];score=0;level=1;speed=6;nextLevelScore=10;spawnInterval=1500;minGap=600;hardcore=false;gravity=1.1;hardcoreText.style.display='none';velocityY=0;jumpCount=0;gameOver=false;player.style.bottom='90px';scoreText.textContent='Score: 0';levelText.textContent='Level: 1';nusdText.textContent='NUSD: '+nusd;gameOverScreen.style.display='none';startObstacleTimer();requestAnimationFrame(update)}
+function restart(){obstacles.forEach(o=>o.remove());coins.forEach(c=>c.remove());obstacles=[];coins=[];score=0;level=1;speed=isMobile?4.5:6;nextLevelScore=10;spawnInterval=1500;minGap=600;hardcore=false;gravity=1.1;hardcoreText.style.display='none';velocityY=0;jumpCount=0;gameOver=false;player.style.bottom='90px';scoreText.textContent='Score: 0';levelText.textContent='Level: 1';nusdText.textContent='NUSD: '+nusd;gameOverScreen.style.display='none';startObstacleTimer();requestAnimationFrame(update)}
 function startGame(){splash.style.display='none';game.style.display='block';startObstacleTimer();requestAnimationFrame(update)}
 startBtn.onclick=startGame
 restartBtn.onclick=restart
