@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SATSUME JUMP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@400;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:linear-gradient(#0b1220,#02050c);font-family:'Rajdhani',Arial,sans-serif;overflow:hidden}
+#game{width:100vw;height:100vh;position:relative;display:none;overflow:hidden}
+#city-bg{position:absolute;inset:0;background:url('satsume-city-bg.png') repeat-x bottom/cover;animation:cityScroll 40s linear infinite;filter:brightness(.7);z-index:0}
+@keyframes cityScroll{from{background-position-x:0}to{background-position-x:-3000px}}
+#ground{position:absolute;bottom:0;width:100%;height:90px;background:linear-gradient(#1e293b,#020617);z-index:2}
+#player{position:absolute;bottom:90px;left:80px;width:80px;height:96px;background:url('satsume-sprite.png') center/80px 96px no-repeat;image-rendering:pixelated;z-index:3}
+.obstacle{position:absolute;bottom:82px;z-index:3}
+.rock{width:100px;height:100px;background:url('rock-sprite.png') center bottom/contain no-repeat}
+.bush{width:80px;height:50px;background:url('bush-sprite.png') center/contain no-repeat}
+.tree{width:96px;height:160px;background:url('tree-sprite.png') center bottom/contain no-repeat}
+.laser{width:80px;height:80px;background:url('laser-sprite.png') center/contain no-repeat;filter:drop-shadow(0 0 12px red)}
+.coin{width:40px;height:40px;background:url('coin-sprite.png') center/contain no-repeat;position:absolute;z-index:3;animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotateY(0deg)}to{transform:rotateY(360deg)}}
+#score,#level,#highScore,#nusd,#title{font-family:'Orbitron',sans-serif;letter-spacing:1px;text-shadow:0 0 8px rgba(56,189,248,.8)}
+#score{top:20px;left:20px;font-size:20px;color:#fff;position:absolute}
+#highScore{top:50px;left:20px;font-size:16px;color:#22d3ee;position:absolute}
+#level{top:80px;left:20px;font-size:16px;color:#a5f3fc;position:absolute}
+#nusd{top:110px;left:20px;font-size:16px;color:#facc15;position:absolute}
+#hardcore{top:140px;left:20px;font-size:14px;color:#ef4444;position:absolute;display:none}
+#title{top:20px;right:20px;font-weight:bold;color:#38bdf8;position:absolute}
+#gameOver{font-family:'Orbitron',sans-serif;display:none;position:absolute;inset:0;background:rgba(0,0,0,.85);color:#fff;align-items:center;justify-content:center;flex-direction:column;font-size:32px}
+#gameOver button{margin-top:20px;padding:14px 30px;font-size:18px;border:none;border-radius:999px;background:#22d3ee;cursor:pointer}
+#splash{position:fixed;inset:0;background:radial-gradient(circle at top,#0ea5e9,#02050c);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:10}
+#splash .logo{font-family:'Orbitron',sans-serif;text-transform:uppercase;font-size:72px;font-weight:900;letter-spacing:4px}
+#splash .subtitle{font-family:'Orbitron',sans-serif;letter-spacing:6px;font-size:30px;color:#38bdf8;margin-bottom:40px}
+#splash button{padding:18px 42px;font-size:22px;border-radius:999px;border:none;background:linear-gradient(135deg,#22d3ee,#0ea5e9);font-weight:bold;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="splash"><div class="logo">SATSUME</div><div class="subtitle">JUMP</div><button id="startBtn">START</button></div>
+<div id="game">
+  <div id="city-bg"></div>
+  <div id="score">Score: 0</div>
+  <div id="highScore">High Score: 0</div>
+  <div id="level">Level: 1</div>
+  <div id="nusd">NUSD: 0</div>
+  <div id="hardcore">🔥 HARDCORE MODE</div>
+  <div id="title">SATSUME JUMP</div>
+  <div id="player"></div>
+  <div id="ground"></div>
+  <div id="gameOver"><div>GAME OVER</div><button id="restartBtn">Main Lagi</button></div>
+</div>
+<script>
+const player=document.getElementById('player')
+const splash=document.getElementById('splash')
+const game=document.getElementById('game')
+const scoreText=document.getElementById('score')
+const levelText=document.getElementById('level')
+const nusdText=document.getElementById('nusd')
+const hardcoreText=document.getElementById('hardcore')
+const gameOverScreen=document.getElementById('gameOver')
+const highScoreText=document.getElementById('highScore')
+let highScore=parseInt(localStorage.getItem('satsumeHighScore')||'0')
+highScoreText.textContent='High Score: '+highScore
+let velocityY=0,gravity=1.1
+let obstacles=[],coins=[]
+let score=0,level=1,nextLevelScore=10
+let nusd=parseInt(localStorage.getItem('satsumeNUSD')||'0')
+nusdText.textContent='NUSD: '+nusd
+let speed=6,gameOver=false,hardcore=false
+let spawnInterval=1500,minGap=600,obstacleTimer=null
+let jumpCount=0
+const maxJump=2,firstJump=21,secondJump=18
+function jump(){if(gameOver)return;if(jumpCount<maxJump){velocityY=jumpCount===0?firstJump:secondJump;jumpCount++}}
+document.addEventListener('keydown',jump)
+document.addEventListener('touchstart',jump)
+function getRandomObstacle(){const pool=['rock','bush'];if(level>=2)pool.push('tree');if(level>=3)pool.push('laser');return pool[Math.floor(Math.random()*pool.length)]}
+function spawnSingleObstacle(offset=0){const o=document.createElement('div');o.className='obstacle '+getRandomObstacle();o.style.left=(game.offsetWidth+offset)+'px';if(o.classList.contains('laser'))o.style.bottom=(120+Math.random()*120)+'px';game.appendChild(o);obstacles.push(o)}
+function spawnCoin(mult=1){
+  for(let i=0;i<mult;i++){
+    const c=document.createElement('div')
+    c.className='coin'
+    c.style.left=(game.offsetWidth+Math.random()*300+i*50)+'px'
+    c.style.bottom=(120+Math.random()*200)+'px'
+    game.appendChild(c)
+    coins.push(c)
+  }
+}
+function createObstacle(){
+  const count=Math.random()<(hardcore?0.6:0.35)?2:1
+  for(let i=0;i<count;i++) spawnSingleObstacle(i*80)
+
+  // 🪙 perbanyak kemunculan koin
+  if(Math.random()<0.8){
+    // spawn 1–3 koin (lebih banyak di hardcore)
+    const coinCount = hardcore
+      ? 2 + Math.floor(Math.random()*2)
+      : 1 + Math.floor(Math.random()*3)
+    spawnCoin(coinCount)
+  }
+}
+function startObstacleTimer(){clearTimeout(obstacleTimer);const randomDelay=()=>Math.max(250,spawnInterval+Math.random()*minGap);const loop=()=>{if(!gameOver){createObstacle();obstacleTimer=setTimeout(loop,randomDelay())}};obstacleTimer=setTimeout(loop,randomDelay())}
+function update(){if(gameOver)return;let bottom=parseInt(player.style.bottom||90);bottom+=velocityY;velocityY-=gravity;if(bottom<=90){bottom=90;jumpCount=0}player.style.bottom=bottom+'px'
+obstacles.forEach((o,i)=>{o.style.left=parseInt(o.style.left)-speed+'px';const p=player.getBoundingClientRect(),b=o.getBoundingClientRect();const shrinkP=12,shrinkO=16;if(p.right-shrinkP>b.left+shrinkO&&p.left+shrinkP<b.right-shrinkO&&p.bottom-shrinkP>b.top+shrinkO&&p.top+shrinkP<b.bottom-shrinkO)endGame();if(parseInt(o.style.left)<-200){o.remove();obstacles.splice(i,1);score++;scoreText.textContent='Score: '+score;if(score>=nextLevelScore)levelUp();if(score>highScore){highScore=score;localStorage.setItem('satsumeHighScore',highScore);highScoreText.textContent='High Score: '+highScore}}})
+coins.forEach((c,i)=>{c.style.left=parseInt(c.style.left)-speed+'px';const p=player.getBoundingClientRect(),b=c.getBoundingClientRect();const shrinkP=10,shrinkC=10;if(p.right-shrinkP>b.left+shrinkC&&p.left+shrinkP<b.right-shrinkC&&p.bottom-shrinkP>b.top+shrinkC&&p.top+shrinkP<b.bottom-shrinkC){c.remove();coins.splice(i,1);nusd++;localStorage.setItem('satsumeNUSD',nusd);nusdText.textContent='NUSD: '+nusd}else if(parseInt(c.style.left)<-100){c.remove();coins.splice(i,1)}})
+requestAnimationFrame(update)}
+function levelUp(){
+  level++
+
+  // hardcore aktif tetap di level 10
+  if(level>=10 && !hardcore){
+    hardcore=true
+    hardcoreText.style.display='block'
+    gravity=1.4
+  }
+
+  // ⏩ peningkatan kecepatan hanya tiap 20 level
+  if(level % 20 === 0){
+    speed += hardcore ? 1.4 : 1
+  }
+
+  // spawn makin rapat tetap bertahap
+  spawnInterval=Math.max(hardcore?300:450,spawnInterval-(hardcore?220:170))
+  minGap=Math.max(200,minGap-60)
+
+  nextLevelScore+=10
+  levelText.textContent='Level: '+level
+  startObstacleTimer()
+}
+function endGame(){gameOver=true;gameOverScreen.style.display='flex'}
+function restart(){obstacles.forEach(o=>o.remove());coins.forEach(c=>c.remove());obstacles=[];coins=[];score=0;level=1;speed=6;nextLevelScore=10;spawnInterval=1500;minGap=600;hardcore=false;gravity=1.1;hardcoreText.style.display='none';velocityY=0;jumpCount=0;gameOver=false;player.style.bottom='90px';scoreText.textContent='Score: 0';levelText.textContent='Level: 1';nusdText.textContent='NUSD: '+nusd;gameOverScreen.style.display='none';startObstacleTimer();requestAnimationFrame(update)}
+function startGame(){splash.style.display='none';game.style.display='block';startObstacleTimer();requestAnimationFrame(update)}
+startBtn.onclick=startGame
+restartBtn.onclick=restart
+console.assert(typeof endGame==='function','endGame missing')
+console.assert(typeof startObstacleTimer==='function','startObstacleTimer missing')
+console.assert(nusd>=0,'NUSD must be non-negative')
+</script>
+</body>
+</html>
